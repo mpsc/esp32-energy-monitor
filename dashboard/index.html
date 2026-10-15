@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>ESP32 Energy Monitor</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a12;color:#e8e8f0;font-family:sans-serif;max-width:560px;margin:0 auto;padding:12px}
+h1{font-size:1.2rem;color:#ffd84d;display:flex;align-items:center;gap:8px}
+h1 .dot{width:9px;height:9px;border-radius:50%;background:#f44}
+h1 .dot.on{background:#0f8;box-shadow:0 0 8px #0f8}
+h1 .dot.demo{background:#4af;box-shadow:0 0 8px #4af}
+.sub{color:#667;font-size:.72rem;margin:2px 0 12px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.card{background:#14141f;border:1px solid #23233a;border-radius:12px;padding:12px}
+.card h3{font-size:.68rem;color:#889;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.big{font-size:1.7rem;font-weight:700}
+.big small{font-size:.85rem;color:#889;font-weight:400}
+.kw{color:#ffd84d}.kv{color:#4af}.ki{color:#f80}.kp{color:#0f8}.kc{color:#f66}.kt{color:#c8f}
+#gaugeWrap{grid-column:1/3;display:flex;align-items:center;gap:14px}
+#gauge{flex-shrink:0}
+#gaugeVal{text-align:center}
+#gaugeVal .big{font-size:2.2rem}
+#chartCard{grid-column:1/3}
+#chart{width:100%;height:130px;display:block}
+#hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:.72rem;color:#667}
+.btn{display:inline-block;padding:9px 16px;border:none;border-radius:8px;cursor:pointer;font-size:.82rem;font-weight:600;background:#23233a;color:#e8e8f0;transition:.15s}
+.btn:hover{background:#2e2e4a}
+.btn.primary{background:#ffd84d;color:#111}.btn.primary:hover{background:#ffe580}
+.btn.danger{background:#3a1420;color:#f66;border:1px solid #5a2030}
+.panel{display:none;background:#14141f;border:1px solid #23233a;border-radius:12px;padding:14px;margin-top:10px}
+.panel.show{display:block}
+.panel h2{font-size:.95rem;color:#ffd84d;margin-bottom:10px}
+.panel h4{font-size:.75rem;color:#889;margin:12px 0 6px;border-top:1px solid #23233a;padding-top:10px}
+.panel h4:first-of-type{border-top:none}
+label{display:block;font-size:.7rem;color:#889;margin:6px 0 2px}
+input[type=text],input[type=password],input[type=number]{width:100%;padding:8px;background:#0a0a12;border:1px solid #2c2c45;border-radius:6px;color:#e8e8f0;font-size:.85rem}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.chk{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:.78rem}
+.chk input{width:auto}
+#toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#0f8;color:#053;padding:10px 20px;border-radius:8px;font-size:.85rem;font-weight:600;display:none;z-index:9}
+#foot{margin-top:12px;font-size:.68rem;color:#445;text-align:center}
+.raw{font-size:.7rem;color:#667;margin-top:6px}
+</style>
+</head>
+<body>
+<h1><span class="dot" id="dot"></span>ESP32 Energy Monitor</h1>
+<p class="sub" id="sub">conectando...</p>
+
+<div id="hdr">
+  <span>Hora: <b id="t">--:--</b> <span id="peakTag" style="color:#f80"></span></span>
+  <span>Up: <b id="up">0</b></span>
+</div>
+
+<div class="grid">
+  <div class="card" id="gaugeWrap">
+    <canvas id="gauge" width="150" height="150"></canvas>
+    <div id="gaugeVal">
+      <h3>Potencia instantanea</h3>
+      <div class="big kw"><span id="p">--</span> <small>W</small></div>
+      <div style="margin-top:8px">
+        <span class="big kt" style="font-size:1.1rem"><span id="cost">--</span> <small>R$</small></span>
+        <h3 style="margin-top:2px">Custo estimado</h3>
+      </div>
+    </div>
+  </div>
+
+  <div class="card"><h3>Tensao</h3><div class="big kv"><span id="v">--</span> <small>V</small></div></div>
+  <div class="card"><h3>Corrente</h3><div class="big ki"><span id="i">--</span> <small>A</small></div></div>
+  <div class="card"><h3>Fator de potencia</h3><div class="big kp"><span id="pf">--</span> <small>%</small></div></div>
+  <div class="card"><h3>Energia total</h3><div class="big"><span id="kt" style="color:#ffd84d">--</span> <small>kWh</small></div>
+    <div class="raw">pico: <b id="kp">0</b> | fora: <b id="ko">0</b> kWh</div></div>
+
+  <div class="card" id="chartCard"><h3>Consumo - ultimos 30 min</h3><canvas id="chart"></canvas></div>
+</div>
+
+<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+  <button class="btn primary" onclick="toggle('cfgPanel')">Configuracoes</button>
+  <button class="btn" onclick="setTime()">Definir hora pelo PC</button>
+  <button class="btn danger" onclick="resetEnergy()">Zerar energia</button>
+</div>
+
+<!-- ============ PAINEL DE CONFIGURACAO ============ -->
+<div class="panel" id="cfgPanel">
+  <h2>Configuracoes</h2>
+
+  <h4>Wi-Fi (estacao)</h4>
+  <label>Nome da rede (SSID) - vazio = só portal cativo</label>
+  <input type="text" id="f_staSsid" autocomplete="off">
+  <label>Senha da rede (deixe em branco para manter)</label>
+  <input type="password" id="f_staPass" placeholder="(mantida)">
+
+  <h4>MQTT / Home Assistant</h4>
+  <label>Host do broker (vazio = MQTT desativado)</label>
+  <input type="text" id="f_mqttHost" placeholder="192.168.0.10 ou homeassistant.local">
+  <div class="row">
+    <div><label>Porta</label><input type="number" id="f_mqttPort" min="1" max="65535"></div>
+    <div><label>Topico base</label><input type="text" id="f_mqttBase"></div>
+  </div>
+  <div class="row">
+    <div><label>Usuario</label><input type="text" id="f_mqttUser" autocomplete="off"></div>
+    <div><label>Senha (branco = mantem)</label><input type="password" id="f_mqttPass"></div>
+  </div>
+  <div class="chk"><input type="checkbox" id="f_haDisc"><label style="margin:0">Auto-discovery Home Assistant (recomendado)</label></div>
+
+  <h4>Tarifa (R$/kWh)</h4>
+  <div class="row">
+    <div><label>Preco hora pico</label><input type="number" id="f_pricePeak" step="0.01"></div>
+    <div><label>Preco fora do pico</label><input type="number" id="f_priceOff" step="0.01"></div>
+  </div>
+  <div class="row">
+    <div><label>Pico comeca as (h)</label><input type="number" id="f_peakStart" min="0" max="23"></div>
+    <div><label>Pico termina as (h)</label><input type="number" id="f_peakEnd" min="0" max="23"></div>
+  </div>
+  <label>Fuso horario (IANA)</label>
+  <input type="text" id="f_tz" placeholder="America/Sao_Paulo">
+
+  <h4>Calibracao</h4>
+  <div class="row">
+    <div><label>Cal. tensao (real/medido)</label><input type="number" id="f_calV" step="0.001"></div>
+    <div><label>Cal. corrente (real/medido)</label><input type="number" id="f_calI" step="0.001"></div>
+  </div>
+  <div class="raw">Offsets ao vivo: tensao <b id="rawV">--</b> mV | corrente <b id="rawI">--</b> mV</div>
+
+  <div style="display:flex;gap:8px;margin-top:14px">
+    <button class="btn primary" onclick="saveCfg()">Salvar e reiniciar</button>
+    <button class="btn" onclick="toggle('cfgPanel')">Fechar</button>
+  </div>
+</div>
+
+<div id="foot">ESP32 Energy Monitor v<span id="ver"></span> &middot; <span id="mode"></span></div>
+<div id="toast"></div>
+
+<script>
+// ================= UTIL =================
+const $ = id => document.getElementById(id);
+function toggle(id){
+  $(id).classList.toggle('show');
+  if($(id).classList.contains('show')){
+    if(DEMO) fillDemoCfg(); else if(!loaded) loadCfg();
+  }
+}
+function fillDemoCfg(){
+  loaded=true;
+  $('f_staSsid').value='MinhaRede'; $('f_mqttHost').value='192.168.0.10';
+  $('f_mqttPort').value=1883; $('f_mqttBase').value='energia'; $('f_haDisc').checked=true;
+  $('f_pricePeak').value=1.10; $('f_priceOff').value=0.85;
+  $('f_peakStart').value=18; $('f_peakEnd').value=21;
+  $('f_calV').value=0.423; $('f_calI').value=0.105;
+}
+function toast(msg,color){ const t=$('toast'); t.textContent=msg; t.style.background=color||'#0f8'; t.style.display='block';
+  setTimeout(()=>t.style.display='none', 3500); }
+const DEMO = new URLSearchParams(location.search).has('demo') || location.hostname.endsWith('github.io');
+
+// ================= HISTORICO / CHART =================
+const hist = [];   // {t, p} - 1 leitura/2s = 900 pontos / 30min
+const MAXH = 900;
+function drawChart(){
+  const c=$('chart'), ctx=c.getContext('2d');
+  c.width=c.clientWidth*2; c.height=260;
+  ctx.scale(2,2);
+  const w=c.clientWidth, h=130;
+  ctx.clearRect(0,0,w,h);
+  if(hist.length<2) return;
+  let mx=100; hist.forEach(e=>{ if(e.p>mx) mx=e.p; });
+  mx*=1.15;
+  // grade
+  ctx.strokeStyle='#23233a'; ctx.lineWidth=.5; ctx.font='9px sans-serif'; ctx.fillStyle='#556';
+  for(let g=0; g<=3; g++){ const y=h-10-(h-20)*g/3;
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke();
+    ctx.fillText(Math.round(mx*g/3)+'W', 2, y-2); }
+  // area
+  const px=i=>i*(w/(MAXH-1)), py=p=>h-10-(h-20)*p/mx;
+  ctx.beginPath(); ctx.moveTo(0,h);
+  hist.forEach((e,i)=>ctx.lineTo(px(i),py(e.p)));
+  ctx.lineTo((hist.length-1)*(w/(MAXH-1)),h); ctx.closePath();
+  const gr=ctx.createLinearGradient(0,0,0,h); gr.addColorStop(0,'rgba(255,216,77,.35)'); gr.addColorStop(1,'rgba(255,216,77,0)');
+  ctx.fillStyle=gr; ctx.fill();
+  // linha
+  ctx.beginPath(); hist.forEach((e,i)=>{ const x=px(i),y=py(e.p); i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
+  ctx.strokeStyle='#ffd84d'; ctx.lineWidth=1.5; ctx.stroke();
+}
+
+// ================= GAUGE =================
+function drawGauge(p){
+  const c=$('gauge'), ctx=c.getContext('2d');
+  const mx=5000;   // escala fixa 0-5kW
+  const v=Math.min(p,mx)/mx;
+  ctx.clearRect(0,0,150,150);
+  ctx.lineWidth=12; ctx.lineCap='round';
+  ctx.strokeStyle='#23233a';
+  ctx.beginPath(); ctx.arc(75,75,58,Math.PI*.75,Math.PI*2.25); ctx.stroke();
+  ctx.strokeStyle='#ffd84d';
+  ctx.beginPath(); ctx.arc(75,75,58,Math.PI*.75,Math.PI*.75+v*Math.PI*1.5); ctx.stroke();
+}
+
+// ================= RENDER =================
+let lastData=null;
+function render(d){
+  lastData=d;
+  $('p').textContent=d.p; $('v').textContent=d.v; $('i').textContent=d.i;
+  $('pf').textContent=d.pf; $('cost').textContent=d.cost;
+  $('kt').textContent=d.kt; $('kp').textContent=d.kp; $('ko').textContent=d.ko;
+  $('t').textContent=d.t; $('up').textContent=fmtUp(d.up);
+  $('peakTag').textContent = d.ntp ? (d.peak?'⚡ HORA PICO':'') : '⚠ hora nao sincronizada';
+  $('rawV').textContent=d.vm; $('rawI').textContent=d.im;
+  drawGauge(d.p);
+  hist.push({p:+d.p}); if(hist.length>MAXH) hist.shift();
+  drawChart();
+}
+function fmtUp(s){ const h=Math.floor(s/3600), m=Math.floor(s%3600/60); return h?h+'h'+m+'m':m+'m'; }
+
+// ================= CONEXAO WS =================
+let loaded=false;
+function connect(){
+  if(DEMO){ runDemo(); return; }
+  const proto=location.protocol==='https:'?'wss':'ws';
+  const w=new WebSocket(proto+'://'+location.host+'/ws');
+  w.onopen=()=>{ $('dot').className='dot on'; $('sub').textContent=location.host; };
+  w.onclose=()=>{ $('dot').className='dot'; $('sub').textContent='reconectando...'; setTimeout(connect,2000); };
+  w.onmessage=e=>render(JSON.parse(e.data));
+}
+
+// ================= MODO DEMO (sem hardware) =================
+function runDemo(){
+  $('dot').className='dot demo';
+  $('mode').textContent='MODO DEMO - dados simulados';
+  $('sub').textContent='dashboard em modo demonstracao';
+  $('ver').textContent='demo';
+  let base=420, spike=0, wh=0, whP=0, whO=0;
+  // semeia 5min de historico
+  for(let i=0;i<150;i++){ hist.push({p:350+Math.random()*200}); }
+  function step(){
+    if(Math.random()<.04) spike=600+Math.random()*1500;
+    spike*=.93;
+    base+= (Math.random()-.5)*40; base=Math.max(150,Math.min(900,base));
+    const p=Math.round(base+spike);
+    const v=(127+(Math.random()-.5)*2).toFixed(1);
+    const i=(p/v).toFixed(3);
+    const pf=(0.86+Math.random()*.12).toFixed(2);
+    const d=new Date(), hr=d.getHours();
+    const peak=(hr>=18&&hr<21);
+    const wInc=p*2/3600; wh+=wInc; if(peak)whP+=wInc; else whO+=wInc;
+    render({p, v, i, pf, cost:(whP/1000*1.1+whO/1000*.85).toFixed(2),
+      kt:(wh/1000).toFixed(4), kp:(whP/1000).toFixed(3), ko:(whO/1000).toFixed(3),
+      t:d.toTimeString().slice(0,5), up:Math.floor(performance.now()/1000),
+      peak, ntp:true, vm:1652, im:1648});
+  }
+  step(); setInterval(step,2000);
+}
+
+// ================= CONFIG =================
+function loadCfg(){
+  fetch('/api/cfg').then(r=>r.json()).then(c=>{
+    loaded=true;
+    $('f_staSsid').value=c.staSsid||'';
+    $('f_mqttHost').value=c.mqttHost||''; $('f_mqttPort').value=c.mqttPort||1883;
+    $('f_mqttUser').value=c.mqttUser||''; $('f_mqttBase').value=c.mqttBase||'energia';
+    $('f_haDisc').checked=!!c.haDisc;
+    $('f_pricePeak').value=c.pricePeak; $('f_priceOff').value=c.priceOff;
+    $('f_peakStart').value=c.peakStart; $('f_peakEnd').value=c.peakEnd;
+    $('f_tz').value=c.tz||'America/Sao_Paulo';
+    $('f_calV').value=c.calV; $('f_calI').value=c.calI;
+  }).catch(()=>toast('Erro ao carregar config','#f44'));
+}
+
+function saveCfg(){
+  if(DEMO){ toast('Modo demo: nada foi salvo','#4af'); return; }
+  const f=new FormData();
+  f.append('staSsid',$('f_staSsid').value);
+  f.append('staPass',$('f_staPass').value);
+  f.append('mqttHost',$('f_mqttHost').value.trim());
+  f.append('mqttPort',$('f_mqttPort').value||1883);
+  f.append('mqttUser',$('f_mqttUser').value);
+  f.append('mqttPass',$('f_mqttPass').value);
+  f.append('mqttBase',$('f_mqttBase').value.trim());
+  if($('f_haDisc').checked) f.append('haDisc','1');
+  f.append('calV',$('f_calV').value||1);
+  f.append('calI',$('f_calI').value||1);
+  f.append('pricePeak',$('f_pricePeak').value||0);
+  f.append('priceOff',$('f_priceOff').value||0);
+  f.append('peakStart',$('f_peakStart').value||0);
+  f.append('peakEnd',$('f_peakEnd').value||0);
+  f.append('tz',$('f_tz').value);
+  fetch('/cfg',{method:'POST',body:f}).then(()=>{
+    toast('Salvo! Reiniciando ESP32...','#ffd84d');
+  }).catch(()=>toast('Erro ao salvar','#f44'));
+}
+
+function resetEnergy(){
+  if(DEMO){ toast('Modo demo: nada foi zerado','#4af'); return; }
+  if(!confirm('Zerar os contadores de energia (kWh)?')) return;
+  fetch('/api/reset-energy',{method:'POST'}).then(()=>toast('Energia zerada!'));
+}
+
+function setTime(){
+  if(DEMO){ toast('Modo demo','#4af'); return; }
+  const f=new FormData(); f.append('epoch',Math.floor(Date.now()/1000));
+  fetch('/api/time',{method:'POST',body:f}).then(()=>toast('Hora definida!'));
+}
+
+// ================= INICIO =================
+if(!DEMO){
+  fetch('/api/state').then(r=>r.json()).then(render).catch(()=>{});
+  $('ver').textContent=''; $('mode').textContent='portal cativo / WiFi AP';
+}
+connect();
+window.onresize=drawChart;
+</script>
+</body>
+</html>
