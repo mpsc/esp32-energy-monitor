@@ -51,6 +51,19 @@ Depois:
 
 Edite os pinos/padroes em [`include/config.h`](include/config.h) se seu hardware diferir.
 
+### 📗 Usando o Arduino IDE (alternativa)
+
+O repo inclui um espelho do firmware como sketch do Arduino IDE em [`arduino/ESP32_Energy_Monitor/`](arduino/ESP32_Energy_Monitor/):
+
+1. Instale o pacote de placas **ESP32 by Espressif** (Gerenciador de Placas)
+2. Bibliotecas via Library Manager: **ArduinoJson** (Benoit Blanchon, v7) e **PubSubClient** (Nick O'Leary, v2.8)
+3. Bibliotecas por ZIP (fora do Library Manager):
+   - [AsyncTCP.zip](https://github.com/me-no-dev/AsyncTCP/archive/refs/heads/master.zip)
+   - [ESPAsyncWebServer.zip](https://github.com/me-no-dev/ESPAsyncWebServer/archive/refs/heads/master.zip)
+4. Abra `ESP32_Energy_Monitor.ino`, selecione a placa **ESP32 Dev Module** e envie
+
+> ⚠️ A fonte de verdade e o projeto PlatformIO (e o que o CI compila). Apos mexer no firmware, copie as mudancas de `src/` e `include/` para `arduino/` (o `web_page.h` ja e sincronizado automaticamente pelo `tools/gen_web_page.py`).
+
 ## 📐 Como funciona a medicao
 
 ```
@@ -93,11 +106,12 @@ Resumo dos topicos (base `energia`):
 │   ├── main.cpp        # Wi-Fi AP+STA, portal cativo, HTTP/WS, config
 │   ├── energy.cpp/.h   # task de amostragem, RMS, potencia, tarifa, NVS
 │   └── mqtt_ha.cpp/.h  # MQTT + auto-discovery do Home Assistant
+├── arduino/ESP32_Energy_Monitor/  # espelho como sketch do Arduino IDE (.ino)
 ├── dashboard/index.html  # fonte do dashboard (editavel, tem modo demo)
 ├── include/
 │   ├── config.h          # pinos e padroes
 │   └── web_page.h        # GERADO a partir do dashboard (nao editar)
-├── tools/gen_web_page.py # regenera o web_page.h
+├── tools/gen_web_page.py # regenera o web_page.h (nos 2 locais)
 └── docs/                 # fiação, calibracao, Home Assistant
 ```
 
