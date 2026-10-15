@@ -1,11 +1,11 @@
 # ⚡ ESP32 Energy Monitor
 
-[![Build](https://github.com/OWNER/REPO/actions/workflows/build.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/build.yml)
+[![Build](https://github.com/mpsc/esp32-energy-monitor/actions/workflows/build.yml/badge.svg)](https://github.com/mpsc/esp32-energy-monitor/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Monitor de consumo de energia em tempo real com **ESP32**, clamp CT **SCT-013** e módulo **ZMPT101B**. Mostra potência, tensão, corrente, fator de potencia, energia acumulada (kWh) e **custo em R$ com tarifa horaria** — tudo em um dashboard web embutido (portal cativo) e no **Home Assistant via MQTT com auto-discovery**.
 
-> 🎮 **Sem hardware?** [Abra o dashboard em modo demo](https://OWNER.github.io/REPO/dashboard/index.html?demo=1) — dados simulados direto no navegador (GitHub Pages).
+> 🎮 **Sem hardware?** [Abra o dashboard em modo demo](https://mpsc.github.io/esp32-energy-monitor/dashboard/index.html?demo=1) — dados simulados direto no navegador (GitHub Pages).
 
 ![Dashboard](docs/screenshots/dashboard.png)
 
@@ -36,7 +36,7 @@ Monitor de consumo de energia em tempo real com **ESP32**, clamp CT **SCT-013** 
 ## 🚀 Inicio rapido
 
 ```bash
-git clone https://github.com/OWNER/REPO.git
+git clone https://github.com/mpsc/esp32-energy-monitor.git
 cd REPO
 pio run                 # compila (ou: python -m platformio run)
 pio run -t upload       # grava via USB
