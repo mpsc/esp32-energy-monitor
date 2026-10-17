@@ -4,7 +4,7 @@
 // ============================================================
 #pragma once
 
-#define FW_VERSION "1.0.0"
+#define FW_VERSION "1.1.0"
 
 // ---------------- PINOS (APENAS ADC1: GPIO32-39) ----------------
 // GPIO34/35 sao input-only (nao possuem pull-up interno)
@@ -42,3 +42,15 @@
 #define PRICE_PEAK_DEFAULT 1.10f   // horario de pico
 #define PEAK_START_DEFAULT 18      // 18h
 #define PEAK_END_DEFAULT   21      // ate 21h (suporta virada de noite)
+
+// ---------------- OTA (ArduinoOTA) ----------------
+// Senha pedida pelo upload OTA. Vazio = sem senha (NAO recomendado em rede
+// compartilhada). Pode ser trocada pela pagina web (persistida na NVS).
+#define OTA_PASSWORD_DEFAULT ""    // ex: "minhaSenhaForte"
+#define OTA_PORT             3232  // porta UDP padrao do ArduinoOTA
+
+// ---------------- HISTORICO (export CSV) ----------------
+// Buffer circular em RAM: 240 amostras a cada 30s = 2h de historico.
+// (RAM-only: zera no reboot. Ver README > "Exportacao CSV".)
+#define HIST_MAX        240
+#define HIST_PERIOD_MS  30000UL

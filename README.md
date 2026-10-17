@@ -20,6 +20,8 @@ Monitor de consumo de energia em tempo real com **ESP32**, clamp CT **SCT-013** 
 - **Energia acumulada persistente**: kWh salvos na flash a cada 60s (nao zera ao reiniciar)
 - **Medicao no core 0** (FreeRTOS task): web server nunca trava, mesmo com a janela de amostragem de 1s
 - **Modo demo** para desenvolvimento da UI sem hardware
+- **Atualizacao OTA (ArduinoOTA)**: regrave o firmware por Wi-Fi (`espota`, `energia.local:3232`) sem desmontar o aparelho, com senha opcional
+- **Exportacao CSV**: botao **Baixar CSV** baixa o historico (`/api/history.csv`) do buffer em RAM (240 amostras, 1 a cada 30s ≈ 2h)
 
 ## 🧩 Pecas
 
@@ -62,7 +64,7 @@ O repo inclui um espelho do firmware como sketch do Arduino IDE em [`arduino/ESP
    - [ESPAsyncWebServer.zip](https://github.com/me-no-dev/ESPAsyncWebServer/archive/refs/heads/master.zip)
 4. Abra `ESP32_Energy_Monitor.ino`, selecione a placa **ESP32 Dev Module** e envie
 
-> ⚠️ A fonte de verdade e o projeto PlatformIO (e o que o CI compila). Apos mexer no firmware, copie as mudancas de `src/` e `include/` para `arduino/` (o `web_page.h` ja e sincronizado automaticamente pelo `tools/gen_web_page.py`).
+> ⚠️ A fonte de verdade e o projeto PlatformIO (e o que o CI compila). Apos mexer no firmware, rode `python tools/sync_arduino.py` (atualiza `src/` e `include/` no espelho) e `python tools/gen_web_page.py` (regenera o `web_page.h` nos 2 locais).
 
 ## 📐 Como funciona a medicao
 
@@ -99,6 +101,39 @@ Resumo dos topicos (base `energia`):
 | `energia/energy` `energy_peak` `energy_off` | kWh (`total_increasing` — funciona no painel de Energia do HA) |
 | `energia/cost` | custo estimado acumulado (R$) |
 
+## ⬆️ Atualizacao OTA (por Wi-Fi)
+
+O firmware sobe um servidor **ArduinoOTA** no boot (`energia.local:3232`), entao da para regravar **sem cabo USB** — desde que o ESP32 esteja na sua rede (STA conectado).
+
+**Senha OTA (recomendada):** preencha em *Configuracoes → Atualizacao OTA*. Fica persistida na NVS (pode ser definida pelo portal cativo, antes mesmo de conectar na rede).
+
+Upload via PlatformIO (o IP/host vai no `--upload-port`):
+
+```bash
+pio run -e esp32dev-ota -t upload --upload-port energia.local
+# com senha, adicione ao env:  upload_flags = --auth=SUA_SENHA
+```
+
+Ou pelo harness HIL do workspace:
+
+```bash
+python ../../tools/hil.py flash esp32-energy-monitor \
+    --env esp32dev-ota --ota-ip energia.local --confirm
+```
+
+> ⚠️ O OTA so funciona com o STA conectado (e o caminho de rede). Mantenha o USB como plano B — o firmware nao tranca a porta serial.
+
+## 📤 Exportacao CSV
+
+O firmware guarda as ultimas **240 amostras** (uma a cada **30s ≈ 2h**) num buffer **na RAM** e disponibiliza:
+
+- botao **"Baixar CSV"** na pagina, ou
+- `GET /api/history.csv` (baixa `energia.csv`)
+
+Colunas: `timestamp,p_w,v_v,i_a,pf,energy_kwh,cost_brl,peak`.
+
+> O historico e **volatil** (zera no reboot) — e um recorte recente, nao um log permanente. Para historico longo, aponte o MQTT para o Home Assistant / InfluxDB (o topico `energia/state` ja traz tudo).
+
 ## 📁 Estrutura
 
 ```
@@ -112,6 +147,7 @@ Resumo dos topicos (base `energia`):
 │   ├── config.h          # pinos e padroes
 │   └── web_page.h        # GERADO a partir do dashboard (nao editar)
 ├── tools/gen_web_page.py # regenera o web_page.h (nos 2 locais)
+├── tools/sync_arduino.py # regenera o espelho do Arduino IDE a partir de src/
 └── docs/                 # fiação, calibracao, Home Assistant
 ```
 
@@ -127,9 +163,9 @@ python tools/gen_web_page.py && pio run
 
 ## 🗺️ Roadmap
 
-- [ ] OTA (ArduinoOTA)
+- [x] OTA (ArduinoOTA)
 - [ ] Fase 2/3 (multiplas fases com um clamp por fase)
-- [ ] Exportacao CSV do historico
+- [x] Exportacao CSV do historico
 - [ ] MQTT sobre TLS
 
 ## 📄 Licenca

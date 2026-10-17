@@ -77,6 +77,7 @@ input[type=text],input[type=password],input[type=number]{width:100%;padding:8px;
 
 <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
   <button class="btn primary" onclick="toggle('cfgPanel')">Configuracoes</button>
+  <button class="btn" onclick="downloadCsv()">Baixar CSV</button>
   <button class="btn" onclick="setTime()">Definir hora pelo PC</button>
   <button class="btn danger" onclick="resetEnergy()">Zerar energia</button>
 </div>
@@ -122,6 +123,11 @@ input[type=text],input[type=password],input[type=number]{width:100%;padding:8px;
     <div><label>Cal. corrente (real/medido)</label><input type="number" id="f_calI" step="0.001"></div>
   </div>
   <div class="raw">Offsets ao vivo: tensao <b id="rawV">--</b> mV | corrente <b id="rawI">--</b> mV</div>
+
+  <h4>Atualizacao OTA</h4>
+  <label>Senha do OTA (branco = mantem; vazio = sem senha)</label>
+  <input type="password" id="f_otaPass" placeholder="(mantida / sem senha)" autocomplete="new-password">
+  <div class="raw">Gravacao remota via ArduinoOTA em <b>energia.local:3232</b> (mesma rede Wi-Fi).</div>
 
   <div style="display:flex;gap:8px;margin-top:14px">
     <button class="btn primary" onclick="saveCfg()">Salvar e reiniciar</button>
@@ -283,6 +289,7 @@ function saveCfg(){
   f.append('peakStart',$('f_peakStart').value||0);
   f.append('peakEnd',$('f_peakEnd').value||0);
   f.append('tz',$('f_tz').value);
+  f.append('otaPass',$('f_otaPass').value);
   fetch('/cfg',{method:'POST',body:f}).then(()=>{
     toast('Salvo! Reiniciando ESP32...','#ffd84d');
   }).catch(()=>toast('Erro ao salvar','#f44'));
@@ -298,6 +305,12 @@ function setTime(){
   if(DEMO){ toast('Modo demo','#4af'); return; }
   const f=new FormData(); f.append('epoch',Math.floor(Date.now()/1000));
   fetch('/api/time',{method:'POST',body:f}).then(()=>toast('Hora definida!'));
+}
+
+function downloadCsv(){
+  if(DEMO){ toast('Modo demo: CSV indisponivel','#4af'); return; }
+  toast('Gerando CSV...','#4af');
+  window.location = '/api/history.csv';
 }
 
 // ================= INICIO =================
