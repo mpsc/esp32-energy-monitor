@@ -27,5 +27,8 @@ jobs:
       - name: Gerar web_page.h
         run: python tools/gen_web_page.py
 
+      - name: Verificar espelho do Arduino IDE
+        run: python tools/sync_arduino.py --check
+
       - name: Compilar
         run: python -m platformio run
